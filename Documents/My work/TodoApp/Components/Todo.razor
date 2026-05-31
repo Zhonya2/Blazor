@@ -1,0 +1,32 @@
+@page "/todo"
+@rendermode InteractiveServer
+<h3>TODO List</h3>
+
+<input @bind="newTask" placeholder="Нове завдання" />
+<button @onclick="AddTask">Додати</button>
+
+<ul>
+    @foreach (var task in tasks)
+    {
+        <li>@task</li>
+    }
+</ul>
+
+@code {
+    private string newTask = "";
+
+    private List<string> tasks = new()
+    {
+        "Виконати завдання",
+        "Підготуватися"
+    };
+
+    private void AddTask()
+    {
+        if (!string.IsNullOrWhiteSpace(newTask))
+        {
+            tasks.Add(newTask);
+            newTask = "";
+        }
+    }
+}
