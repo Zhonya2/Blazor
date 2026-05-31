@@ -1,0 +1,66 @@
+@page "/demo"
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+
+<h3>Two-Way Binding</h3>
+
+<input @bind="UserName" @bind:event="oninput" class="form-control" />
+
+<p>Ви ввели: @UserName</p>
+
+<hr>
+
+<h3>Cascading Value</h3>
+
+<CascadingValue Value="Theme">
+    <ChildComponent />
+</CascadingValue>
+
+<hr>
+
+<h3>Виклик JS з C#</h3>
+
+<button class="btn btn-primary" @onclick="CallJs">
+    Показати повідомлення
+</button>
+
+<hr>
+
+<h3>Виклик C# з JS</h3>
+
+<button class="btn btn-success" @onclick="RegisterDotNet">
+    Зареєструвати C#
+</button>
+
+<button class="btn btn-warning ms-2" onclick="callCSharp()">
+    Викликати C# з JS
+</button>
+
+<p>@Message</p>
+
+@code {
+    private string UserName = "";
+
+    private string Theme = "Dark";
+
+    private string Message = "Очікування виклику...";
+
+    private async Task CallJs()
+    {
+        await JS.InvokeVoidAsync("showMessage", "Привіт з C#");
+    }
+
+    private async Task RegisterDotNet()
+    {
+        await JS.InvokeVoidAsync(
+            "registerDotNetHelper",
+            DotNetObjectReference.Create(this));
+    }
+
+    [JSInvokable]
+    public void UpdateMessage(string text)
+    {
+        Message = text;
+        StateHasChanged();
+    }
+}
