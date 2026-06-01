@@ -1,0 +1,255 @@
+@page "/advancedtodo"
+@rendermode InteractiveServer
+
+@using System.Text.Json
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    Advanced TODO Lists
+</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6">Створення нового списку</MudText>
+
+    <MudTextField T="string"
+                  @bind-Value="NewListName"
+                  Label="Назва списку"
+                  Immediate="true"
+                  Class="mt-2" />
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               OnClick="CreateList"
+               Class="mt-3">
+        Створити список
+    </MudButton>
+</MudPaper>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6">Фільтри</MudText>
+
+    <MudSwitch T="bool"
+               @bind-Value="HideCompleted"
+               Color="Color.Success">
+        Приховати виконані
+    </MudSwitch>
+
+    <MudSwitch T="bool"
+               @bind-Value="HideNotCompleted"
+               Color="Color.Error">
+        Приховати невиконані
+    </MudSwitch>
+</MudPaper>
+
+@if (Lists.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        Поки що немає списків. Введіть назву списку і натисніть "Створити список".
+    </MudAlert>
+}
+
+@foreach (var list in Lists)
+{
+    <MudPaper Class="pa-4 my-4">
+
+        <MudText Typo="Typo.h6">
+            @list.Name
+        </MudText>
+
+        <MudTextField T="string"
+                      @bind-Value="list.NewTask"
+                      Label="Нова задача"
+                      Immediate="true"
+                      Class="mt-2" />
+
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   OnClick="() => AddTask(list)"
+                   Class="mt-3">
+            Додати задачу
+        </MudButton>
+
+        <MudDivider Class="my-3" />
+
+        @if (!GetVisibleTasks(list).Any())
+        {
+            <MudText Typo="Typo.body2">
+                Немає задач для відображення.
+            </MudText>
+        }
+
+        @foreach (var task in GetVisibleTasks(list))
+        {
+            <MudCheckBox T="bool"
+                         @bind-Value="task.IsDone"
+                         Label="@task.Text"
+                         Color="Color.Primary" />
+        }
+
+    </MudPaper>
+}
+
+<MudPaper Class="pa-4 my-4">
+    <MudText Typo="Typo.h6">Імпорт / Експорт JSON</MudText>
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Info"
+               OnClick="ExportJson"
+               Class="mt-2">
+        Експорт
+    </MudButton>
+
+    <MudTextField T="string"
+                  Lines="10"
+                  Label="JSON"
+                  @bind-Value="JsonText"
+                  Immediate="true"
+                  Class="my-3" />
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Warning"
+               OnClick="ImportJson">
+        Імпорт
+    </MudButton>
+
+    @if (!string.IsNullOrWhiteSpace(ImportMessage))
+    {
+        <MudAlert Severity="@ImportSeverity" Class="mt-3">
+            @ImportMessage
+        </MudAlert>
+    }
+</MudPaper>
+
+@code {
+    private string NewListName = "";
+    private string JsonText = "";
+    private string ImportMessage = "";
+
+    private Severity ImportSeverity = Severity.Info;
+
+    private bool HideCompleted;
+    private bool HideNotCompleted;
+
+    private List<TodoList> Lists = new();
+
+    private void CreateList()
+    {
+        if (string.IsNullOrWhiteSpace(NewListName))
+            return;
+
+        Lists.Add(new TodoList
+        {
+            Name = NewListName.Trim(),
+            NewTask = "",
+            Tasks = new List<TodoTask>()
+        });
+
+        NewListName = "";
+    }
+
+    private void AddTask(TodoList list)
+    {
+        if (string.IsNullOrWhiteSpace(list.NewTask))
+            return;
+
+        list.Tasks.Add(new TodoTask
+        {
+            Text = list.NewTask.Trim(),
+            IsDone = false
+        });
+
+        list.NewTask = "";
+    }
+
+    private IEnumerable<TodoTask> GetVisibleTasks(TodoList list)
+    {
+        return list.Tasks.Where(task =>
+            !(HideCompleted && task.IsDone) &&
+            !(HideNotCompleted && !task.IsDone));
+    }
+
+    private void ExportJson()
+    {
+        JsonText = JsonSerializer.Serialize(
+            Lists,
+            new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+        ImportSeverity = Severity.Success;
+        ImportMessage = "Списки успішно експортовано в JSON.";
+    }
+
+    private void ImportJson()
+    {
+        ImportMessage = "";
+
+        if (string.IsNullOrWhiteSpace(JsonText))
+        {
+            ImportSeverity = Severity.Error;
+            ImportMessage = "Поле JSON порожнє.";
+            return;
+        }
+
+        try
+        {
+            var importedLists = JsonSerializer.Deserialize<List<TodoList>>(
+                JsonText,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            if (importedLists == null)
+            {
+                ImportSeverity = Severity.Error;
+                ImportMessage = "Не вдалося імпортувати списки.";
+                return;
+            }
+
+            foreach (var list in importedLists)
+            {
+                if (list.Name == null)
+                    list.Name = "";
+
+                if (list.NewTask == null)
+                    list.NewTask = "";
+
+                if (list.Tasks == null)
+                    list.Tasks = new List<TodoTask>();
+
+                foreach (var task in list.Tasks)
+                {
+                    if (task.Text == null)
+                        task.Text = "";
+                }
+            }
+
+            Lists = importedLists;
+
+            HideCompleted = false;
+            HideNotCompleted = false;
+
+            ImportSeverity = Severity.Success;
+            ImportMessage = "Імпорт виконано успішно.";
+        }
+        catch (Exception ex)
+        {
+            ImportSeverity = Severity.Error;
+            ImportMessage = $"Помилка імпорту: {ex.Message}";
+        }
+    }
+
+    public class TodoList
+    {
+        public string Name { get; set; } = "";
+        public string NewTask { get; set; } = "";
+        public List<TodoTask> Tasks { get; set; } = new();
+    }
+
+    public class TodoTask
+    {
+        public string Text { get; set; } = "";
+        public bool IsDone { get; set; }
+    }
+}
